@@ -8,6 +8,7 @@ data Expr
   | Array [Expr]
   | Tuple [Expr]
   | Index Expr Expr
+  | DelayedIndex [Expr] Int
   | Lambda String Expr
   | App Expr Expr
   | If Expr Expr Expr
@@ -25,6 +26,33 @@ data Ops a
   | BinOp BinOp a a
   deriving (Show, Eq)
 
+-- Step function
+step :: Expr -> Expr 
+step (Const n) = Const n
+step (Var x) = error $ "Unbound variable: " ++ x
+step (Array es) = Array $ map step es
+step (Tuple es) = Tuple $ map step es
+step (Index arr idx) = case (step arr, step idx) of
+  (Array arr', Const i) -> DelayedIndex arr' i  -- Delay the indexing operation
+  _ -> error "Indexing error"
+step (DelayedIndex arr i) = arr !! i 
+step (Lambda x body) = Lambda x body
+step (App (Lambda x body) arg) = step $ substitute x (step arg) body
+step (If cond thenExpr elseExpr) = case step cond of
+  Const 0 -> elseExpr
+  _ -> thenExpr
+step (Ops (BinOp op e1 e2)) = case (step e1, step e2) of
+  (Const n1, Const n2) -> Const $ applyOp op n1 n2
+  _ -> error "Binary operation error"
+step (Ops (Map f arr)) = case step arr of
+  Array arr' -> Array $ map (step . App f) arr'
+  _ -> error "Map error"
+step (Ops (Iota n)) = case step n of
+  Const n' -> Array $ map Const [0..n'-1]
+  _ -> error "Iota error"
+step (Ops (Size arr)) = case step arr of
+  Array arr' -> Const $ length arr'
+  _ -> error "Size error"
 
 -- Evaluation function
 eval :: Expr -> Expr

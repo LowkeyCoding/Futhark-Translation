@@ -10,4 +10,8 @@ exampleExpr =
 
 main :: IO ()
 main = do
-  print (eval exampleExpr)
+  print (exampleExpr)
+  let s1 = step exampleExpr
+  print s1
+  let s2 = step s1
+  print s2
