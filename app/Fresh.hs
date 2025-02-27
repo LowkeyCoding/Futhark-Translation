@@ -10,7 +10,7 @@ freshName :: String -> NameGenerator String
 freshName prefix = do
   counter <- get          -- Get the current counter value
   put (counter + 1)       -- Increment the counter
-  return (prefix ++ show counter)  -- Return a fresh name like "prefix0", "prefix1", etc.
+  return (prefix ++ "_" ++ show counter)  -- Return a fresh name like "prefix0", "prefix1", etc.
 
 -- Helper function to run the name generator
 runNameGenerator :: NameGenerator a -> a

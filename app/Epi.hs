@@ -1,15 +1,15 @@
-module Main where
+module Epi where
 
 -- Eπ Syntax
 data Process
   = Nul                                             -- Inactive process
-  | Sen Channel [Term] Process                      -- Send terms on a channel
-  | Rec Channel [String] Process                    -- Receive terms on a channel
+  | Send Channel [Term] Process                     -- Send terms on a channel
+  | Recv Channel [String] Process                   -- Receive terms on a channel
   | Broad Channel [Term] Process                    -- Broadcat terms on a channel
   | Par Process Process                             -- Parrallel composition
   | Rep Process                                     -- Replication 
   | Res String Process                              -- Restriction a channel name (νa.P)
-  | Mat Term Term Comparison Process Process        -- Match construct [T1 ⋈ T2] P Q
+  | Match Term Term Comparison Process Process      -- Match construct [T1 ⋈ T2] P Q
   deriving (Show, Eq)
 
 data Channel
@@ -20,7 +20,7 @@ data Channel
 
 data Term
   = Number Int                                      -- Numeric term (n)
-  | ChannelTerm Channel                             -- Channel as a term
+  | TChan Channel                                   -- Channel as a term
   | BinaryOp BinOp Term Term                        -- Binary operation (T1 ⊙ T2)
   deriving (Show, Eq)
 
