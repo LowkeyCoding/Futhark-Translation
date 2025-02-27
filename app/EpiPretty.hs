@@ -14,10 +14,10 @@ prettyProcess process = case process of
   Recv chan vars cont ->
     prettyChannel chan <> "(" <> intercalate "," vars <> ")." <> prettyProcess cont
   Broad chan terms cont ->
-    prettyChannel chan <> "·⟨" <> intercalate "," (map prettyTerm terms) <> "⟩." <> prettyProcess cont
-  Par p q -> parens (prettyProcess p <> " | " <> prettyProcess q)
+    prettyChannel chan <> ":⟨" <> intercalate "," (map prettyTerm terms) <> "⟩." <> prettyProcess cont
+  Par p q -> prettyProcess p <> " | " <> prettyProcess q
   Rep p -> "!" <> parens (prettyProcess p)
-  Res name p -> "ν" <> name <> "." <> prettyProcess p
+  Res name p -> "ν" <> name <> "." <> "(" <> prettyProcess p <> ")"
   Match t1 t2 comp p q ->
     "[" <> prettyTerm t1 <> " " <> prettyComp comp <> " " <> prettyTerm t2 <> "] (" 
     <> prettyProcess p <> ") (" <> prettyProcess q <> ")"
