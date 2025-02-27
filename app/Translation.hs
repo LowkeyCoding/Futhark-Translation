@@ -68,15 +68,27 @@ translateToEpi (Tuple es) o = do
     let n = length es
     outputNames <- replicateM n (freshName "o") -- Generate names "o0", "o1", ..., "on"
     valueNames <- replicateM n (freshName "v")  -- Generate names "v0", "v1", ..., "vn"
-    h <- freshName "h"
+    h <- freshName "h"                          -- Create a fresh handle
     -- Translate each element of the tuple with its corresponding fresh name
     elementProcesses <- zipWithM translateToEpi es outputNames
     -- Create the final process using the given pattern
-    let tupleProcess = combineProcesses outputNames elementProcesses valueNames h o
+    let tupleProcess = combineProcessesTuple outputNames elementProcesses valueNames h o
     return tupleProcess
 
--- translateToEpi (Array es) o = do 
---    let n = length es
+translateToEpi (Array es) o = do 
+    let n = length es
+    outputNames <- replicateM n (freshName "o") -- Generate names "o0", "o1", ..., "on"
+    valueNames <- replicateM n (freshName "v")  -- Generate names "v0", "v1", ..., "vn"
+    returnNames <- replicateM n (freshName "r")  -- Generate names "r0", "r1", ..., "rn"
+    h <- freshName "h"                          -- Create a fresh handle
+    -- Translate each element of the tuple with its corresponding fresh name
+    elementProcesses <- zipWithM translateToEpi es outputNames
+    let receiveResults = foldr (\(chan, var) acc -> Recv (Name chan) [var] acc) Nul (zip outputNames valueNames)
+    let len = Rep (Par (Send (Labelled (Name h) "len") [Number n] Nul) (Send (Name o) [tname h] Nul))
+    let cells = foldr (\(index, value ,return) acc -> (Par (cell h index value return) acc)) len (zip3  [0..n] valueNames returnNames) 
+    return (foldr Res (Par receiveResults cells) outputNames)
+cell :: String -> Int -> String -> String -> Epi.Process
+cell h i v r = Rep (Recv (Labelled (Name h) "all") [r] (Send (Variable r) [Number i, tvar v] Nul))
 
 -- Helper function to combine the processes into the final tuple process
 combineProcessesTuple :: [String]   -- Generated output channel names (o1, o2, ..., on)

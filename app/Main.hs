@@ -16,7 +16,7 @@ exampleExpr =
 main :: IO ()
 main = do
   -- Run the generator to get the translated process
-  let example = (Tuple [Const 1, Const 2])
+  let example = (Array [Const 1, Const 2])
   let translatedProcess = runNameGenerator (translateToEpi example "o")
   putStrLn ("Butf: "<>(prettyExpr example))
   putStrLn ("E𝜋: $"<>(prettyProcess translatedProcess) <> "$")
