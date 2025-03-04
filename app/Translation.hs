@@ -11,51 +11,41 @@ tname x = TChan (Name x)
 tvar :: String -> Epi.Term
 tvar x = TChan (Variable x)
 zipWith3M f xs ys zs =
-  zipWithM (\x -> \(y,z) -> (f x y z)) xs (zip ys zs)
+  zipWithM (\ x (y,z) -> f x y z) xs (zip ys zs)
 -- Translate a Butf expression to an Epi process
 -- Update the type signature to include NameGenerator
 translateToEpi :: Butf.Expr -> String -> NameGenerator Epi.Process
 translateToEpi (Const n) o = return $ Send (Name o) [Number n] Nul
 translateToEpi (Var x) o = return $ Send (Name o) [tname x] Nul
 translateToEpi (Lambda x e) o = do
-    h <- freshName "h" 
+    h <- freshName "h"
     r <- freshName "r"
     translatedBody <- translateToEpi e r  -- Translate body expression with the return channel r
     return $ Res h (Par (Send (Name o) [tname h] Nul) (Rep (Recv (Name h) [x, r] translatedBody)))
 translateToEpi (If e1 e2 e3) o = do
-    o1 <- freshName "o" 
+    o1 <- freshName "o"
     v <- freshName "v"
     cond <- translateToEpi e1 o1
     _then <-  translateToEpi e2 o
     _else <- translateToEpi e3 o
     return $ Res o1 (
-        Par (
-            cond
-        ) (
+        Par cond (
             Recv (Name o1) [v] (
-                Match (tvar v) (Number 0) Neq (
-                    _then
-                ) (
-                    _else
-                )
+                Match (tvar v) (Number 0) Neq _then _else
             )
         ))
 
 translateToEpi (App e1 e2) o = do
-    o1 <- freshName "o"  
-    o2 <- freshName "o" 
-    h <- freshName  "h" 
-    v <- freshName  "v" 
-    e1' <- translateToEpi e1 o1 
-    e2' <- translateToEpi e2 o2 
+    o1 <- freshName "o"
+    o2 <- freshName "o"
+    h <- freshName  "h"
+    v <- freshName  "v"
+    e1' <- translateToEpi e1 o1
+    e2' <- translateToEpi e2 o2
     return $ Res o1 (Res o2 (
-            Par (
-                e1'
-            ) (
-                Par (
-                    e2'
-                ) (
-                    Recv (Name o1) [h] ( 
+            Par e1' (
+                Par e2' (
+                    Recv (Name o1) [h] (
                         Recv (Name o2) [v] (
                             Send (Name h) [tvar v, tvar o] Nul
                         )
@@ -75,7 +65,7 @@ translateToEpi (Tuple es) o = do
     let tupleProcess = combineProcessesTuple outputNames elementProcesses valueNames h o
     return tupleProcess
 
-translateToEpi (Array es) o = do 
+translateToEpi (Array es) o = do
     let n = length es
     outputNames <- replicateM n (freshName "o") -- Generate names "o0", "o1", ..., "on"
     valueNames <- replicateM n (freshName "v")  -- Generate names "v0", "v1", ..., "vn"
@@ -85,8 +75,20 @@ translateToEpi (Array es) o = do
     elementProcesses <- zipWithM translateToEpi es outputNames
     let receiveResults = foldr (\(chan, var) acc -> Recv (Name chan) [var] acc) Nul (zip outputNames valueNames)
     let len = Rep (Par (Send (Labelled (Name h) "len") [Number n] Nul) (Send (Name o) [tname h] Nul))
-    let cells = foldr (\(index, value ,return) acc -> (Par (cell h index value return) acc)) len (zip3  [0..n] valueNames returnNames) 
-    return (foldr Res (Par receiveResults cells) outputNames)
+    let cells = foldr (\(index, value ,return) acc -> Par (cell h index value return) acc) len (zip3  [0..n] valueNames returnNames)
+    return (foldr Res (Par (foldr Par receiveResults elementProcesses) cells) outputNames)
+
+translateToEpi (Index e1 e2) o = do 
+    o1 <- freshName "o"
+    o2 <- freshName "o"
+    e1' <- translateToEpi e1 o1 
+    e2' <- translateToEpi e2 o2 
+    h <- freshName "h"
+    i <- freshName "i"
+    v <- freshName "v"
+    _i <- freshName "i"
+    return (Res o1 (Res o2 (Par e1' (Par e2' (Recv (Name o1) [h] (Recv (Name o2) [i] (Match (tname i) (Number 0) Geq  (Recv (Labelled (Name h)  i) [_i, v] (Send (Name o) [tname v] Nul)) Nul)))))))
+
 cell :: String -> Int -> String -> String -> Epi.Process
 cell h i v r = Rep (Recv (Labelled (Name h) "all") [r] (Send (Variable r) [Number i, tvar v] Nul))
 
@@ -112,12 +114,12 @@ combineProcessesTuple outputNames elementProcesses vs h o =
     sendTuple = Rep (Send (Labelled (Name h) "tup") (map tvar vs) Nul)
 
     -- Combine receiver and sender
-    receiverSender = (Par receiveResults (Res h (Par sendHandle sendTuple)))
+    receiverSender = Par receiveResults (Res h (Par sendHandle sendTuple))
 
     -- Parallel composition of all element processes
     unrestrictedTuple = foldr Par receiverSender elementProcesses
-    
+
   in
     -- Combine everything with restrictions
-    foldr Res (unrestrictedTuple ) outputNames
+    foldr Res unrestrictedTuple outputNames
 

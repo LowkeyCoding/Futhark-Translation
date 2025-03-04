@@ -6,18 +6,25 @@ import Data.List
 -- Pretty print an Eπ process
 parens :: String -> String
 parens s = "(" <> s <> ")"
+
+over :: String -> String -> String
+over s c = "overshell(" <> c <> "," <> s <> ")"
+
+under :: String -> String -> String
+under s c = "undershell(" <> c <> "," <> s <> ")"
+
 prettyProcess :: Process -> String
 prettyProcess process = case process of
-  Nul -> "0"
+  Nul -> "null"
   Send chan terms cont ->
-    prettyChannel chan <> "⟨" <> intercalate "," (map prettyTerm terms) <> "⟩." <> prettyProcess cont
+    "send(" <> prettyChannel chan <> "," <> intercalate "\\," (map prettyTerm terms) <> ")." <> prettyProcess cont
   Recv chan vars cont ->
-    prettyChannel chan <> "(" <> intercalate "," vars <> ")." <> prettyProcess cont
+    "receive" <> "(" <> prettyChannel chan  <> "," <> intercalate "\\," vars <> ")." <> prettyProcess cont
   Broad chan terms cont ->
-    prettyChannel chan <> ":⟨" <> intercalate "," (map prettyTerm terms) <> "⟩." <> prettyProcess cont
+    "broad(" <> prettyChannel chan <> "," <> intercalate "\\," (map prettyTerm terms) <> ")." <> prettyProcess cont
   Par p q -> prettyProcess p <> " | " <> prettyProcess q
   Rep p -> "!" <> parens (prettyProcess p)
-  Res name p -> "ν" <> name <> "." <> "(" <> prettyProcess p <> ")"
+  Res name p -> "nu " <> name <> "." <> "(" <> prettyProcess p <> ")"
   Match t1 t2 comp p q ->
     "[" <> prettyTerm t1 <> " " <> prettyComp comp <> " " <> prettyTerm t2 <> "] (" 
     <> prettyProcess p <> ") (" <> prettyProcess q <> ")"
