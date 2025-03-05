@@ -1,6 +1,5 @@
-module Butf where 
-
-
+module Butf where
+import Binop
 -- AST for ButF expressions
 data Expr
   = Const Int
@@ -15,10 +14,6 @@ data Expr
   | Iota Expr
   | Size Expr
   | BinOp BinOp Expr Expr
-  deriving (Show, Eq)
-
--- Binary operations
-data BinOp = Add | Sub | Mul | Div | Mod
   deriving (Show, Eq)
 
 -- Evaluation function
@@ -40,15 +35,14 @@ eval (BinOp op e1 e2) = case (eval e1, eval e2) of
   (Const n1, Const n2) -> Const $ applyOp op n1 n2
   _ -> error "Binary operation error"
 eval (Map e) = case (eval e) of
-  Tuple [Lambda x body , Array arr] -> Array $ map (eval . App (Lambda x body)) arr
+  Tuple [Lambda x body, Array arr] -> Array $ map (eval . App (Lambda x body)) arr
   res -> error ("Map error: expected a tuple (function, array) got:" ++ (show res))
 eval (Iota n) = case eval n of
-  Const n' -> Array $ map Const [0..n'-1]
+  Const n' -> Array $ map Const [0 .. n' - 1]
   _ -> error "Iota error"
 eval (Size arr) = case eval arr of
   Array arr' -> Const $ length arr'
   _ -> error "Size error"
-
 
 -- Substitute a variable with an expression in another expression
 substitute :: String -> Expr -> Expr -> Expr
@@ -59,10 +53,10 @@ substitute x val (Index arr idx) = Index (substitute x val arr) (substitute x va
 substitute x val (Lambda y body) = if x == y then Lambda y body else Lambda y (substitute x val body)
 substitute x val (App f arg) = App (substitute x val f) (substitute x val arg)
 substitute x val (If cond thenExpr elseExpr) = If (substitute x val cond) (substitute x val thenExpr) (substitute x val elseExpr)
-substitute x val (BinOp op e1 e2) =  BinOp op (substitute x val e1) (substitute x val e2)
-substitute x val (Map e) =  Map (substitute x val e)
-substitute x val (Iota n) =  Iota (substitute x val n)
-substitute x val (Size arr) =  Size (substitute x val arr)
+substitute x val (BinOp op e1 e2) = BinOp op (substitute x val e1) (substitute x val e2)
+substitute x val (Map e) = Map (substitute x val e)
+substitute x val (Iota n) = Iota (substitute x val n)
+substitute x val (Size arr) = Size (substitute x val arr)
 substitute _ _ e = e
 
 -- Apply a binary operation

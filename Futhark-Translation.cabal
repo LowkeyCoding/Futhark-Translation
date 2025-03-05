@@ -31,7 +31,7 @@ executable Futhark-Translation
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.17.2.0, mtl ^>=2.2.2
-    other-modules:    Butf, Epi, EpiPretty, ButfPretty, Fresh, Translation
+    build-depends:    base ^>=4.17.2.0, mtl ^>=2.2.2, strings ^>=1.1
+    other-modules:    Butf, Epi, EpiPretty, ButfPretty, Fresh, Translation, Binop
     hs-source-dirs:   app
     default-language: Haskell2010

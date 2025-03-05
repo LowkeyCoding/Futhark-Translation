@@ -1,25 +1,21 @@
 module Main where
 
 import Butf
-import Epi
-import Translation
-import Fresh
+import Data.List (intercalate)
 import EpiPretty
-import ButfPretty
-exampleExpr :: Expr
-exampleExpr =
-  Index (Map (Tuple [
-    Lambda "x"  (BinOp Butf.Add (Var "x") (Const 1)),  -- λx. x + 1
-    Array [Const 1, Const 2, Const 3]             -- [1, 2, 3]
-  ])) (Const 2)
+import Epi
+import Binop
+import Fresh (runNameGenerator)
+import Translation
 
 main :: IO ()
 main = do
-  -- Run the generator to get the translated process
-  let ex1 = Array [Const 2, Const 3]
-  let ex2 = Index (Array [Const 2, Const 3]) (Const 1)
-  let tp1 = runNameGenerator (translateToEpi ex1 "o")
-  let tp2 = runNameGenerator (translateToEpi ex2 "o")
-  putStrLn ("Butf: "<> prettyExpr ex1)
-  putStrLn ("E𝜋: $"<>prettyProcess tp2 <> "$")
-  --putStrLn ("E𝜋: $"<>prettyProcess translatedProcess2 <> "$")
+  let arrayExpr = Lambda "x" (BinOp Add (Var "x") (Const 1))-- Example: [2,3][1]
+      outputChannel = "o"
+      generator = translateToEpi arrayExpr outputChannel
+      (process, log) = runNameGenerator generator
+
+  putStrLn "Translation Log:"
+  putStrLn log
+  putStrLn "\nTranslated Process:"
+  print process
