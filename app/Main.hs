@@ -10,7 +10,7 @@ import Translation
 
 main :: IO ()
 main = do
-  let arrayExpr = Lambda "x" (BinOp Add (Var "x") (Const 1))-- Example: [2,3][1]
+  let arrayExpr = Index (Array [Const 2, Const 3]) (Const 1)-- Example: [2,3][1]
       outputChannel = "o"
       generator = translateToEpi arrayExpr outputChannel
       (process, log) = runNameGenerator generator

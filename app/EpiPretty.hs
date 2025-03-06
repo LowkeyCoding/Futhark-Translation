@@ -37,7 +37,7 @@ prettyProcess process = case process of
       <> prettyTerm t2
       <> "] ("
       <> prettyProcess p
-      <> ") ("
+      <> "), ("
       <> prettyProcess q
       <> ")"
 

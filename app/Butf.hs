@@ -34,9 +34,9 @@ eval (If cond thenExpr elseExpr) = case eval cond of
 eval (BinOp op e1 e2) = case (eval e1, eval e2) of
   (Const n1, Const n2) -> Const $ applyOp op n1 n2
   _ -> error "Binary operation error"
-eval (Map e) = case (eval e) of
+eval (Map e) = case eval e of
   Tuple [Lambda x body, Array arr] -> Array $ map (eval . App (Lambda x body)) arr
-  res -> error ("Map error: expected a tuple (function, array) got:" ++ (show res))
+  res -> error ("Map error: expected a tuple (function, array) got:" ++ show res)
 eval (Iota n) = case eval n of
   Const n' -> Array $ map Const [0 .. n' - 1]
   _ -> error "Iota error"
