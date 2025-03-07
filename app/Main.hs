@@ -10,7 +10,7 @@ import Translation
 
 main :: IO ()
 main = do
-  let arrayExpr = Index (Array [Const 2, Const 3]) (Const 1) -- Example: [2,3][1]
+  let arrayExpr = Map (Tuple [Lambda "x" (BinOp Add (Var "x") (Const 1)), Array [Const 2, Const 3]]) -- Example: [2,3][1]
       outputChannel = "o"
       generator = translateToEpi arrayExpr outputChannel
       (process, log) = runNameGenerator generator
@@ -19,3 +19,5 @@ main = do
   putStrLn log
   putStrLn "\nTranslated Process:"
   print process
+  putStrLn "\nEvaluated Process:"
+  print (eval arrayExpr)

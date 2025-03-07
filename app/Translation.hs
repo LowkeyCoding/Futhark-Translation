@@ -25,10 +25,12 @@ translateToEpi (Const n) o = do
   let process = Send (Name o) [Number n] Nul
       log = over (show n) process
   return (process, log)
+
 translateToEpi (Var x) o = do
   let process = Send (Name o) [tname x] Nul
       log = over x process
   return $ (process, log)
+
 translateToEpi (Array es) o = do
   let n = length es
   outputNames <- replicateM n (freshName "o")
@@ -76,6 +78,21 @@ translateToEpi (Array es) o = do
   let allLogs = elementLogs ++ [receiverLog] ++ cellLogs ++ [lenLog] ++ [handleLog]
   let restrictedLog = foldr (\name log -> "nu " ++ name ++ ".(" ++ log ++ ")") (intercalate "|" allLogs) (outputNames ++ [h])
   return (arrayProcess, restrictedLog ++ "\\ ")
+
+translateToEpi (Tuple es) o = do
+    let n = length es
+    outputNames <- replicateM n (freshName "o")
+    valueNames <- replicateM n (freshName "o")
+    h <- freshName "h"
+    elements <- forM (zip es outputNames) $ uncurry translateToEpi
+    let (elementProcesses, elementLogs) = unzip elements
+
+    let receiverSender = Par (foldr (\(c,v) a -> Recv (Name c) [v] a) Nul (zip outputNames valueNames ))
+               (Res h (Par (Send (Name o) [tname h] Nul) 
+                      (Rep (Send (Labelled (Name h) "tup") (map tvar valueNames) Nul))))
+        process = (foldr Res (foldr Par receiverSender elementProcesses) outputNames)
+
+    return (process, prettyProcess process)
 translateToEpi (Index e1 e2) o = do
   o1 <- freshName "o"
   o2 <- freshName "o"
@@ -133,6 +150,7 @@ translateToEpi (Index e1 e2) o = do
           (intercalate "|" allLogs)
           [o1, o2]
   return (finalProcess, restrictedLog ++ "\\ ")
+
 translateToEpi (Lambda x e) o = do
   h <- freshName "h"
   r <- freshName "r"
@@ -141,6 +159,7 @@ translateToEpi (Lambda x e) o = do
       log = under ("lambda " ++ h) (prettyProcess $ lambda (Res "e'" Nul))
       logS = sReplace "nu e'.(null)" (under "body" bodyLog) log
   return (lambda e', logS)
+
 translateToEpi (App e1 e2) o = do
   o1 <- freshName "o"
   o2 <- freshName "o"
@@ -158,6 +177,7 @@ translateToEpi (App e1 e2) o = do
       logS4 = sReplace "nu func.(null),\"receiver\")" (",\"receiver\")" ++ over "func" func) logS3
       full x y z = Res o1 (Res o2 (Par x (Par y z)))
   return (full e1' e2' (receiver func), logS4)
+
 translateToEpi (If e1 e2 e3) o = do
   o1 <- freshName "o"
   v <- freshName "v"
@@ -171,6 +191,7 @@ translateToEpi (If e1 e2 e3) o = do
       log2 = sReplace "nu e2'.(null)" e2Logs log1
       log3 = sReplace "nu e3'.(null)" e3Logs log2
   return (_if e1' e2' e3', log3)
+
 translateToEpi (BinOp op e1 e2) o = do
   o1 <- freshName "o"
   o2 <- freshName "o"
@@ -188,6 +209,7 @@ translateToEpi (BinOp op e1 e2) o = do
       logS4 = sReplace "nu binop.(null),\"receiver\")" (",\"receiver\")" ++ over "binop" binop) logS3
       full x y z = Res o1 (Res o2 (Par x (Par y z)))
   return (full e1' e2' (receiver binop), logS4)
+
 translateToEpi (Size e) o = do
   o1 <- freshName "o"
   h <- freshName "h"
@@ -197,6 +219,7 @@ translateToEpi (Size e) o = do
   let size = \x -> Res o1 (Par x (Recv (Name o1) [h] (Recv (Labelled (Variable h) "len") [n] (Send (Name o) [tvar n] Nul))))
       log = sReplace "nu e'.(null)" eLogs (prettyProcess (size (Res "e'" Nul)))
   return (size e', log)
+
 translateToEpi (Iota e) o = do
   o1 <- freshName "o"
   r <- freshName "r"
@@ -211,6 +234,7 @@ translateToEpi (Iota e) o = do
   let process = \x -> Res o1 (Res r (Res h (Par x (Par (Recv (Name o1) [n] r_proc) (Nul)))))
       log = sReplace "nu e'.(null)" eLogs (prettyProcess (process (Res "e'" Nul)))
   return (process e', log)
+
 translateToEpi (Map e) o = do
   o1 <- freshName "o"
   o' <- freshName "o"
@@ -258,6 +282,7 @@ _cell h i v r =
           (Rep (Send (Labelled (Name h) (show i)) [tvar i, tvar v] Nul))
       log = over ("cell_" ++ show i) process
    in (process, log)
+
 
 repeater :: String -> String -> String -> String -> String -> (Process, String)
 repeater s r d c n =
