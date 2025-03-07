@@ -1,8 +1,8 @@
 module EpiPretty where
 
+import Binop
 import Data.List
 import Epi
-import Binop
 
 -- Pretty print an Eπ process
 parens :: String -> String

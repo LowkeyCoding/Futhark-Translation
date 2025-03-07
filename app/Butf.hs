@@ -1,5 +1,7 @@
 module Butf where
+
 import Binop
+
 -- AST for ButF expressions
 data Expr
   = Const Int

@@ -1,8 +1,8 @@
 module Fresh where
 
 import Control.Monad.State
-import qualified Data.Map as Map
 import Data.Map (Map)
+import qualified Data.Map as Map
 
 -- Define a type for generating fresh names, using a map to track per-prefix counters
 type NameGenerator = State (Map String Int)

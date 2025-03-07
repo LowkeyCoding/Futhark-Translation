@@ -1,5 +1,7 @@
 module Epi where
+
 import Binop
+
 -- Eπ Syntax
 data Process
   = Nul -- Inactive process

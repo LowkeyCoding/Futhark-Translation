@@ -1,8 +1,8 @@
 module ButfPretty where
 
+import Binop
 import Butf
 import Data.List
-import Binop
 
 -- Pretty print an Eπ process
 parens :: String -> String
