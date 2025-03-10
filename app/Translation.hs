@@ -77,22 +77,33 @@ translateToEpi (Array es) o = do
       handleLog = over "handle" handle
   let allLogs = elementLogs ++ [receiverLog] ++ cellLogs ++ [lenLog] ++ [handleLog]
   let restrictedLog = foldr (\name log -> "nu " ++ name ++ ".(" ++ log ++ ")") (intercalate "|" allLogs) (outputNames ++ [h])
-  return (arrayProcess, restrictedLog ++ "\\ ")
+  return (arrayProcess, "undershell("++restrictedLog++",\"array\")")
 
 translateToEpi (Tuple es) o = do
     let n = length es
     outputNames <- replicateM n (freshName "o")
-    valueNames <- replicateM n (freshName "o")
+    valueNames <- replicateM n (freshName "v")  -- Ensure value names are distinct
     h <- freshName "h"
     elements <- forM (zip es outputNames) $ uncurry translateToEpi
-    let (elementProcesses, elementLogs) = unzip elements
+    let (elementProcesses, _elementLogs) = unzip elements
+        elementLogs = map (++"\\ ") _elementLogs
 
-    let receiverSender = Par (foldr (\(c,v) a -> Recv (Name c) [v] a) Nul (zip outputNames valueNames ))
-               (Res h (Par (Send (Name o) [tname h] Nul) 
+    let receiverSenderProcess = 
+            Par (foldr (\(c,v) a -> Recv (Name c) [v] a) Nul (zip outputNames valueNames))
+                (Res h (Par (Send (Name o) [tname h] Nul) 
                       (Rep (Send (Labelled (Name h) "tup") (map tvar valueNames) Nul))))
-        process = (foldr Res (foldr Par receiverSender elementProcesses) outputNames)
+        process = foldr Res (foldr Par receiverSenderProcess elementProcesses) outputNames
 
-    return (process, prettyProcess process)
+        -- Collect component logs
+        receiverLog = over "receiver" (foldr (\(c,v) a -> Recv (Name c) [v] a) Nul (zip outputNames valueNames))
+        handleLog = over "handle" (Send (Name o) [tname h] Nul)
+        repLog = over "rep" (Rep (Send (Labelled (Name h) "tup") (map tvar valueNames) Nul))
+        allLogs = elementLogs ++ [receiverLog, handleLog, repLog]
+        -- Apply restrictions to the combined logs H should be added earlier
+        restrictedLog = foldr (\name log -> "nu " ++ name ++ ".(" ++ log ++ ")") (intercalate "|" allLogs) (outputNames ++ [h])
+
+    return (process, "undershell("++restrictedLog++",\"tuple\")")
+
 translateToEpi (Index e1 e2) o = do
   o1 <- freshName "o"
   o2 <- freshName "o"
@@ -258,13 +269,62 @@ translateToEpi (Map e) o = do
   let (r_proc, r_log) = repeater n count done cpriv npriv
   (e', eLogs) <- translateToEpi e o1
   let (c_proc, c_log) = _cell arr' index fvalue rcpriv
-  let process = (\x y z -> Res o1 (Par x (Recv (Name o1) [args] (Recv (Labelled (Variable args) "tup") [func, arr] (Recv (Labelled (Variable arr) "len") [n] (Res vals (Recv (Labelled (Variable arr) "all") [vals] (Res count (Par y (Par (Rep (Recv (Name vals) [index, value] (Res freturn (Send (Name func) [tname value, tname freturn] (Recv (Name freturn) [fvalue] (Recv (Name count) [temp1, temp2] z)))))) (Par (Res o' (Send (Name func) [Number 0, tname o'] (Recv (Name done) [] (Send (Name o) [tname arr] Nul)))) (Rep (Send (Labelled (Name arr) "len") [tvar n] Nul)))))))))))))
-      log1 = prettyProcess (process (Res "1" Nul) (Res "2" Nul) (Res "3" Nul))
-      log2 = sReplace "nu 1.(null)" eLogs log1
-      log3 = sReplace "nu 2.(null)" r_log log2
-      log4 = sReplace "nu 3.(null)" c_log log3
-  return (process e' r_proc c_proc, log4)   
+  let arr_len = (Rep (Send (Labelled (Name arr) "len") [tvar n] Nul))
+      new_handle = (Send (Name o) [tname arr'] Nul)
+      bound_check = \h -> (Send (Name func) [Number 0, tname o'] (Recv (Name done) [] h))
+      r_bc = \bc -> Res o' bc
+      apply_func = \cell -> (Send (Name func) [tname value, tname freturn] (Recv (Name freturn) [fvalue] (Recv (Name count) [temp1, temp2] cell)))
+      r_af = \af -> Res freturn af
+      get_values = \r_af -> Recv (Name vals) [index, value] r_af
+      r_gv = \gv -> Rep gv
+      cl = \x y -> Par x y
+      ploop = \x y z -> Par x (Par y z)
+      r_loop = \x -> Res count x 
+      get_arrv = \x -> Recv (Labelled (Variable arr) "all") [vals] x
+      r_get_arrv = \x -> Res vals x 
+      get_args = \x -> (Recv (Name o1) [args] (Recv (Labelled (Variable args) "tup") [func, arr] (Recv (Labelled (Variable arr) "len") [n] x)))
+      process = (\x y -> Res o1 (Par x y))
+      -- logging
+      new_handle_log = over "new array" new_handle
+      arr_len_log = over "arry length" arr_len
+      bound_check_log = prettyProcess (bound_check (hole "new_handle"))
+      apply_func_log = prettyProcess (apply_func (hole "cell"))
+      get_values_log = prettyProcess (get_values (hole "afr"))
+      get_arrv_log = prettyProcess (get_arrv (hole "loop"))
+      r_get_arrv_log = prettyProcess (r_get_arrv (hole "arv1"))
+      get_args_log = prettyProcess (get_args (hole "arv"))
+      process_log = prettyProcess (process (hole "e'") (hole "rest"))
+
+      fcheck1 = ruhole "new_handle" "bound_check" (new_handle_log) bound_check_log
+      fcheck = rhole "bc" fcheck1 (prettyProcess (r_bc (hole "bc")))
+      cell_af1 = ruhole "cell" "apply func" ("("++c_log++")") apply_func_log
+      cell_af2 = rhole "af" cell_af1 (prettyProcess (r_af (hole "af")))
+      cell_af3 = rhole "afr" cell_af2 get_values_log
+      cell_af = rhole "afrv" cell_af3 (prettyProcess (r_gv (hole "afrv")))
+      check_len1 = rhole "al" arr_len_log (prettyProcess (cl (hole "bc") (hole "al")))
+      check_len = rhole "bc" fcheck check_len1
+      loop1 = rhole "count" r_log (prettyProcess (ploop (hole "count") (hole "cell_af") (hole "check_len"))) 
+      loop2 = rhole "cell_af" ("\\ "++cell_af) loop1
+      loop3 = rhole "check_len" ("\\ "++check_len) loop2 
+      loop  = rhole "loop3" loop3 (prettyProcess (r_loop (hole "loop3")))
+      arv1  = ruhole "loop" "elements" loop get_arrv_log
+      arv   = rhole "arv1" arv1 r_get_arrv_log
+      marg  = ruhole "arv" "arguments" arv get_args_log
+
+      --logb4p = rhole "adad" logb2rv 
+      final1 = rhole "e'" (eLogs) process_log
+      final  = rhole "rest" (marg) final1
+  return (process e' (get_args (r_get_arrv (get_arrv (r_loop (ploop r_proc (r_gv (get_values (r_af (apply_func  c_proc)))) (cl (bound_check new_handle) arr_len)))))) , final)   
 -- Helper functions
+hole :: String -> Process
+hole x = (Res x Nul)
+
+rhole :: String -> String -> String -> String
+rhole x y z= sReplace ("nu " <> x <> ".(null)") y z
+
+ruhole :: String -> String -> String -> String -> String
+ruhole nu no pu r = "overshell("++ (sReplace ("nu "++ nu ++".(null)") (",\""<>no<>"\")" ++ pu) r)
+
 cell :: String -> Int -> String -> String -> (Process, String)
 cell h i v r =
   let process =
